@@ -18,7 +18,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 TOKEN = os.environ.get("TOKEN", "9078968898:AAHsT8Kt4iQAyYbxEM0v6AMWXj3XI4MCSdU")
-TEACHER_ID = 8691474457  # O'qituvchi ID si
+TEACHER_ID = 5552792356# O'qituvchi ID si
 
 # Bazani yaratish
 def init_db():
