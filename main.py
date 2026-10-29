@@ -59,10 +59,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "Assalomu alaykum, ustoz Shaxriyor!\n\n"
             "👨‍🏫 **O'qituvchi boshqaruv paneli**\n\n"
-            "✍️ **Test savollarini yuklash:**\n"
-            "`/setquestions [test_id] [matn]` (masalan: `/setquestions 1 1-savol...`)\n\n"
+            "✍️ **Test savolini yuklash:**\n"
+            "`/setquestions [test_raqami] [savollar matni]`\n"
+            "*(Misol: `/setquestions 501 1-savol...`)*\n\n"
             "🔑 **Kalit yuklash:**\n"
-            "`/setanswers [test_id] [kalit]` (masalan: `/setanswers 1 a,b,c,503`)\n\n"
+            "`/setanswers [test_raqami] [kalitlar]`\n"
+            "*(Misol: `/setanswers 501 a,b,c,503`)*\n\n"
             "⏱ **Timer o'rnatish:** `/settimer 30`\n"
             "🏆 **Reytingni ko'rish:** `/rating`",
             parse_mode="Markdown"
@@ -80,9 +82,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         test_id, q_text = row
         await update.message.reply_text(
-            f"Assalomu alaykum! Test ID: <b>{test_id}</b>\n\n"
+            f"Assalomu alaykum! Test raqami (ID): <b>{test_id}</b>\n\n"
             f"📋 **Test savollari:**\n{q_text}\n\n"
-            f"✍️ **Javob yuborish usuli:**\n"
+            f"✍️ **Javob yuborish tartibi:**\n"
             f"Javoblarni vergul bilan (`a, b, c`) yoki pastma-past (`1 a`, `2 b`) qilib yuboring.",
             parse_mode="HTML"
         )
@@ -95,7 +97,10 @@ async def set_questions(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if len(context.args) < 2:
-        await update.message.reply_text("⚠️ Xato! Format: `/setquestions [test_id] [savol matni]`", parse_mode="Markdown")
+        await update.message.reply_text(
+            "⚠️ Xato format!\nTo'g'ri yozilishi: `/setquestions [test_raqami] [savol matni]`\nMasalan: `/setquestions 501 Savollar...`",
+            parse_mode="Markdown"
+        )
         return
 
     test_id = context.args[0]
@@ -107,7 +112,7 @@ async def set_questions(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.commit()
     conn.close()
 
-    await update.message.reply_text(f"✅ {test_id}-raqamli test savollari saqlandi!")
+    await update.message.reply_text(f"✅ **{test_id}**-raqamli test savollari muvaffaqiyatli saqlandi!")
 
 # Test kalitlarini o'rnatish (/setanswers)
 async def set_answers(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -117,7 +122,10 @@ async def set_answers(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if len(context.args) < 2:
-        await update.message.reply_text("⚠️ Xato! Format: `/setanswers [test_id] [kalitlar]` (Masalan: `/setanswers 1 a,b,c`)", parse_mode="Markdown")
+        await update.message.reply_text(
+            "⚠️ Xato format!\nTo'g'ri yozilishi: `/setanswers [test_raqami] [kalitlar]`\nMasalan: `/setanswers 501 a,b,c,d`",
+            parse_mode="Markdown"
+        )
         return
 
     test_id = context.args[0]
@@ -129,7 +137,7 @@ async def set_answers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.commit()
     conn.close()
 
-    await update.message.reply_text(f"✅ {test_id}-raqamli test kalitlari saqlandi!\nKalit: `{key}`", parse_mode="Markdown")
+    await update.message.reply_text(f"✅ **{test_id}**-raqamli test kalitlari saqlandi!\nKalit: `{key}`", parse_mode="Markdown")
 
 # Timer o'rnatish
 async def set_timer(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -163,22 +171,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
     if user_id == TEACHER_ID:
+        # O'qituvchi shunchaki matn yuborsa, oxirgi ishlatilgan test raqamiga saqlaydi
         conn = sqlite3.connect("test_bot.db")
         cursor = conn.cursor()
         cursor.execute("SELECT test_id FROM questions ORDER BY rowid DESC LIMIT 1")
         row = cursor.fetchone()
-        test_id = row[0] if row else "1"
+        test_id = row[0] if row else "501"
         
         cursor.execute("INSERT OR REPLACE INTO questions (test_id, question_text) VALUES (?, ?)", (test_id, text))
         conn.commit()
         conn.close()
         
-        await update.message.reply_text(f"✅ Matn {test_id}-testga saqlandi! Kalitni yuklash uchun `/setanswers {test_id} [kalit]` yuboring.")
+        await update.message.reply_text(
+            f"✅ Matn **{test_id}**-raqamli testga saqlandi!\n"
+            f"Kalitini yuklash uchun quyidagini yuboring:\n"
+            f"`/setanswers {test_id} [kalit]`",
+            parse_mode="Markdown"
+        )
     else:
+        # O'quvchi javob yuboryapti
         conn = sqlite3.connect("test_bot.db")
         cursor = conn.cursor()
-        
-        # Eng oxirgi test ID ni aniqlaymiz
         cursor.execute("SELECT test_id, answer_key FROM answers ORDER BY rowid DESC LIMIT 1")
         row = cursor.fetchone()
         
@@ -221,7 +234,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.close()
 
         await update.message.reply_text(
-            f"📊 **Test natijangiz (Test ID: {test_id}):**\n"
+            f"📊 **Test natijangiz (Test raqami: {test_id}):**\n"
             f"To'g'ri javoblar: {score} / {total}"
         )
 
