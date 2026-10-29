@@ -50,23 +50,45 @@ def init_db():
 
 init_db()
 
+# /start buyrug'i
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id == TEACHER_ID:
         await update.message.reply_text(
             "Assalomu alaykum, ustoz Shaxriyor!\n\n"
             "👨‍🏫 **O'qituvchi boshqaruv paneli**\n\n"
-            "✍️ Test savollarini yuklash uchun quyidagi buyruqdan foydalaning:\n"
+            "✍️ Test savollarini yuklash uchun:\n"
             "`/setquestions [savollar matni]`\n\n"
             "🔑 Kalit yuklash uchun:\n"
-            "`/setanswers abcd...`\n\n"
+            "`/setanswers 42,72,55,b,c...`\n\n"
             "⏱ Timer o'rnatish uchun:\n"
             "`/settimer 30`",
             parse_mode="Markdown"
         )
     else:
+        # O'quvchi uchun: bazadan oxirgi savol va kalitni o'qib olamiz
+        conn = sqlite3.connect("test_bot.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT question_text FROM questions LIMIT 1")
+        row = cursor.fetchone()
+        
+        cursor.execute("SELECT answer_key FROM answers LIMIT 1")
+        key_row = cursor.fetchone()
+        conn.close()
+
+        if not row or not key_row:
+            await update.message.reply_text(
+                "⚠️ Hozircha o'qituvchi tomonidan test savollari yoki kalitlari kiritilmagan. Biroz kuting!"
+            )
+            return
+
+        q_text = row[0]
+
         await update.message.reply_text(
-            "Assalomu alaykum! Testni yechish uchun o'z javoblaringizni yuboring."
+            f"Assalomu alaykum! Testni yechish uchun o'z javoblaringizni vergul bilan yuboring "
+            f"(masalan: `42,72,55,...` yoki `abccb...`).\n\n"
+            f"📋 **Test savollari:**\n{q_text}",
+            parse_mode="Markdown"
         )
 
 # Test savollarini yuklash (/setquestions)
@@ -83,12 +105,11 @@ async def set_questions(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Buyruqdan keyingi barcha matnni savol sifatida yig'ib olamiz
     text = " ".join(context.args)
 
     conn = sqlite3.connect("test_bot.db")
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM questions")
+    cursor.execute("DELETE FROM questions") # Eskisini o'chirish
     cursor.execute("INSERT INTO questions (question_text) VALUES (?)", (text,))
     conn.commit()
     conn.close()
@@ -113,7 +134,7 @@ async def set_answers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     conn = sqlite3.connect("test_bot.db")
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM answers")
+    cursor.execute("DELETE FROM answers") # Eskisini o'chirish
     cursor.execute("INSERT INTO answers (answer_key) VALUES (?)", (key,))
     conn.commit()
     conn.close()
@@ -134,13 +155,13 @@ async def set_timer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     time_val = context.args[0]
     await update.message.reply_text(f"⏱ Timer {time_val} daqiqaga o'rnatildi!")
 
-# Oddiy xabarlar (O'quvchilar javobi uchun)
+# Xabarlarni qabul qilish (O'quvchilar javobini tekshirish)
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text
 
     if user_id == TEACHER_ID:
-        await update.message.reply_text("⚠️ Savollarni yuklash uchun `/setquestions` buyruqidan foydalaning!")
+        await update.message.reply_text("⚠️ Savollarni yuklash uchun `/setquestions`, kalit uchun `/setanswers` buyruqlaridan foydalaning!")
     else:
         conn = sqlite3.connect("test_bot.db")
         cursor = conn.cursor()
