@@ -25,21 +25,18 @@ TEACHER_ID = 8691474457  # O'qituvchining Telegram ID si
 def init_db():
     conn = sqlite3.connect("test_bot.db")
     cursor = conn.cursor()
-    # Savollar jadvali
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS questions (
             test_id TEXT PRIMARY KEY,
             question_text TEXT
         )
     """)
-    # Kalitlar jadvali
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS answers (
             test_id TEXT PRIMARY KEY,
             answer_key TEXT
         )
     """)
-    # Natijalar jadvali
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS results (
             user_id INTEGER,
@@ -63,12 +60,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Assalomu alaykum, ustoz Shaxriyor!\n\n"
             "👨‍🏫 **O'qituvchi boshqaruv paneli**\n\n"
             "✍️ **Test savollarini yuklash:**\n"
-            "`/setquestions [test_id] [matn]` (masalan: `/setquestions 1 1-savol...`)\n"
-            "*(Yoki shunchaki matn yuborsangiz ham oxirgi testga saqlanadi)*\n\n"
+            "`/setquestions [test_id] [matn]` (masalan: `/setquestions 1 1-savol...`)\n\n"
             "🔑 **Kalit yuklash:**\n"
             "`/setanswers [test_id] [kalit]` (masalan: `/setanswers 1 a,b,c,503`)\n\n"
-            "⏱ **Timer o'rnatish (daqiqada):**\n"
-            "`/settimer 30`\n\n"
+            "⏱ **Timer o'rnatish:** `/settimer 30`\n"
             "🏆 **Reytingni ko'rish:** `/rating`",
             parse_mode="Markdown"
         )
@@ -88,12 +83,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Assalomu alaykum! Test ID: <b>{test_id}</b>\n\n"
             f"📋 **Test savollari:**\n{q_text}\n\n"
             f"✍️ **Javob yuborish usuli:**\n"
-            f"Siz javoblarni quyidagicha yuborishingiz mumkin:\n"
-            f"• Vergul bilan: `a, b, c, 503`\n"
-            f"• Qatorma-qator (raqami bilan yoki raqamsiz):\n"
-            f"1 a\n"
-            f"2 b\n"
-            f"3 c",
+            f"Javoblarni vergul bilan (`a, b, c`) yoki pastma-past (`1 a`, `2 b`) qilib yuboring.",
             parse_mode="HTML"
         )
 
@@ -127,7 +117,7 @@ async def set_answers(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if len(context.args) < 2:
-        await update.message.reply_text("⚠️ Xato! Format: `/setanswers [test_id] [kalitlar]` (Masalan: `/setanswers 1 a,b,c,503`)", parse_mode="Markdown")
+        await update.message.reply_text("⚠️ Xato! Format: `/setanswers [test_id] [kalitlar]` (Masalan: `/setanswers 1 a,b,c`)", parse_mode="Markdown")
         return
 
     test_id = context.args[0]
@@ -141,7 +131,7 @@ async def set_answers(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(f"✅ {test_id}-raqamli test kalitlari saqlandi!\nKalit: `{key}`", parse_mode="Markdown")
 
-# Timer o'rnatish va vaqt tugaganda xabar berish
+# Timer o'rnatish
 async def set_timer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != TEACHER_ID:
@@ -158,9 +148,8 @@ async def set_timer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ Faqat raqam kiriting!")
         return
 
-    await update.message.reply_text(f"⏱ Timer {minutes} daqiqaga o'rnatildi. Vaqt tugagach xabar beriladi!")
+    await update.message.reply_text(f"⏱ Timer {minutes} daqiqaga o'rnatildi.")
 
-    # Fon rejibida vaqtni kutish
     chat_id = update.effective_chat.id
     async def timer_task():
         await asyncio.sleep(minutes * 60)
@@ -174,7 +163,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
     if user_id == TEACHER_ID:
-        # O'qituvchi to'g'ridan-to'g'ri matn yuborsa oxirgi testga qo'shamiz
         conn = sqlite3.connect("test_bot.db")
         cursor = conn.cursor()
         cursor.execute("SELECT test_id FROM questions ORDER BY rowid DESC LIMIT 1")
@@ -187,9 +175,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await update.message.reply_text(f"✅ Matn {test_id}-testga saqlandi! Kalitni yuklash uchun `/setanswers {test_id} [kalit]` yuboring.")
     else:
-        # O'quvchi javob yuboryapti
         conn = sqlite3.connect("test_bot.db")
         cursor = conn.cursor()
+        
+        # Eng oxirgi test ID ni aniqlaymiz
         cursor.execute("SELECT test_id, answer_key FROM answers ORDER BY rowid DESC LIMIT 1")
         row = cursor.fetchone()
         
@@ -201,7 +190,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         test_id, raw_key = row
         correct_key = [k.strip().lower() for k in raw_key.replace(" ", "").split(",")]
         
-        # O'quvchi javoblarini tozalash va qatorma-qator yoki vergul bo'yicha o'qish
         clean_text = text.replace("\r", "")
         user_answers = []
         
@@ -211,7 +199,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for line in clean_text.split("\n"):
                 line = line.strip()
                 if line:
-                    # Agar "1 a" yoki "1) a" shaklida yuborgan bo'lsa, faqat javob qismini (harf/raqamni) olamiz
                     parts = line.split()
                     if len(parts) > 1 and (parts[0].endswith(")") or parts[0].isdigit()):
                         user_answers.append(parts[-1].lower())
@@ -266,7 +253,7 @@ def main():
     app.add_handler(CommandHandler("rating", rating))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
 
-    print("Bot muvaffaqiyatli ishga tushdi...")
+    print("Bot ishga tushdi...")
     app.run_polling()
 
 if __name__ == "__main__":
