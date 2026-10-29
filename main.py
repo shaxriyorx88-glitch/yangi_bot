@@ -176,15 +176,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     conn = sqlite3.connect("test_bot.db")
     cursor = conn.cursor()
+    
+    # Eng oxirgi kiritilgan test kalitini qidiramiz (o'qituvchi xohlagan payt oldin kalit yoki savol kiritgan bo'lishidan qat'i nazar)
     cursor.execute("SELECT test_id, answer_key FROM answers ORDER BY rowid DESC LIMIT 1")
     row = cursor.fetchone()
     
     if not row:
-        await update.message.reply_text("⚠️ Hozircha o'qituvchi test kalitini kiritmagan.")
+        await update.message.reply_text("⚠️ Hozircha o'qituvchi test kalitini kiritmagan. Iltimos, kuting!")
         conn.close()
         return
 
     test_id, raw_key = row
+    
+    # Tekshiramiz: shu test_id bo'yicha savollar ham mavjudmi?
+    cursor.execute("SELECT question_text FROM questions WHERE test_id = ?", (test_id,))
+    q_row = cursor.fetchone()
+    
+    if not q_row:
+        await update.message.reply_text("⚠️ Bu test uchun hali savollar kiritilmagan!")
+        conn.close()
+        return
+
     correct_key = [k.strip().lower() for k in raw_key.replace(" ", "").split(",")]
     
     clean_text = text.replace("\r", "")
