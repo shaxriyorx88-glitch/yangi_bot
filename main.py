@@ -2,7 +2,7 @@ import sqlite3
 import logging
 import os
 import asyncio
-from flask import Flask
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from threading import Thread
 from telegram import Update
 from telegram.ext import (
@@ -22,18 +22,24 @@ logger = logging.getLogger(__name__)
 TOKEN = os.environ.get("TOKEN", "9078968898:AAHsT8Kt4iQAyYbxEM0v6AMWXj3XI4MCSdU")
 TEACHER_ID = 5552792356  # O'qituvchi ID si
 
-# --- RENDER UCHUN FLASK SERVER (15 daqiqada o'chib qolmasligi uchun) ---
-app_web = Flask('')
+# --- RENDER UCHUN ODDIY WEB SERVER (Qo'shimcha kutubxona talab etilmaydi) ---
+class SimpleHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"Bot ishlayapti!")
+    
+    def log_message(self, format, *args):
+        pass  # Loglarni to'ldirib yubormasligi uchun
 
-@app_web.route('/')
-def home():
-    return "Bot ishlayapti!"
-
-def run_web():
-    app_web.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
+def run_server():
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(('0.0.0.0', port), SimpleHandler)
+    server.serve_forever()
 
 def keep_alive():
-    t = Thread(target=run_web)
+    t = Thread(target=run_server)
     t.start()
 # --------------------------------------------------------------------
 
@@ -251,7 +257,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 def main():
-    # Flask serverni ishga tushiramiz (Render uxlab qolmasligi uchun)
+    # Render uxlab qolmasligi uchun veb-serverni fon rejimida ishga tushiramiz
     keep_alive()
 
     app = ApplicationBuilder().token(TOKEN).build()
