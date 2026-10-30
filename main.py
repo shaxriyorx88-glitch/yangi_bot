@@ -2,6 +2,8 @@ import sqlite3
 import logging
 import os
 import asyncio
+from flask import Flask
+from threading import Thread
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
@@ -19,6 +21,21 @@ logger = logging.getLogger(__name__)
 
 TOKEN = os.environ.get("TOKEN", "9078968898:AAHsT8Kt4iQAyYbxEM0v6AMWXj3XI4MCSdU")
 TEACHER_ID = 5552792356  # O'qituvchi ID si
+
+# --- RENDER UCHUN FLASK SERVER (15 daqiqada o'chib qolmasligi uchun) ---
+app_web = Flask('')
+
+@app_web.route('/')
+def home():
+    return "Bot ishlayapti!"
+
+def run_web():
+    app_web.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
+
+def keep_alive():
+    t = Thread(target=run_web)
+    t.start()
+# --------------------------------------------------------------------
 
 # Bazani yaratish
 def init_db():
@@ -171,13 +188,12 @@ async def rating(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id == TEACHER_ID:
-        return  # O'qituvchi matn yuborsa e'tibor bermaymiz, buyruqdan foydalanadi
+        return
 
     text = update.message.text
     conn = sqlite3.connect("test_bot.db")
     cursor = conn.cursor()
     
-    # Eng oxirgi kiritilgan test kalitini qidiramiz (o'qituvchi xohlagan payt oldin kalit yoki savol kiritgan bo'lishidan qat'i nazar)
     cursor.execute("SELECT test_id, answer_key FROM answers ORDER BY rowid DESC LIMIT 1")
     row = cursor.fetchone()
     
@@ -188,7 +204,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     test_id, raw_key = row
     
-    # Tekshiramiz: shu test_id bo'yicha savollar ham mavjudmi?
     cursor.execute("SELECT question_text FROM questions WHERE test_id = ?", (test_id,))
     q_row = cursor.fetchone()
     
@@ -236,6 +251,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 def main():
+    # Flask serverni ishga tushiramiz (Render uxlab qolmasligi uchun)
+    keep_alive()
+
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
